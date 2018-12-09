@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/python
 """HurricaneDNS Command Line tools/shell
 
 Inspired by & heavily borrowed from the EveryDNS Command Line tool/shell by
@@ -17,6 +17,8 @@ import cmd
 import pkg_resources
 from shlex import split as split_args
 import HurricaneDNS
+from getpass import getpass
+import keyring
 
 __version__ = pkg_resources.require("hurricanedns")[0].version
 __author__ = "Brian Hartvigsen <brian.andrew@brianandjenny.com>"
@@ -426,11 +428,23 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('-v', '--version', action='version', version="%%(prog)s %s (%s)" % (__version__, __author__))
     parser.add_argument('username', help="Your HE DNS username")
-    parser.add_argument('password', help="Your HE DNS password")
+    parser.add_argument('-p', '--password', help="Your HE DNS password", default=None, required=False)
+    parser.add_argument('--logout', action='store_true', help='Delete credentials from keyring')
     parser.add_argument('command', nargs=argparse.REMAINDER,
                         help="An optional command, if blank we drop into interactive mode")
     options = parser.parse_args()
+    creds = keyring.get_credential("dns.he.net", options.username)
+    if options.logout:
+        keyring.delete_password("dns.he.net", options.username)
+        exit(0)
+    if options.password is None and creds is None:
+        options.password = getpass()
+    elif options.password is None and creds is not None:
+        options.password = creds.password
 
+    if creds is None:
+        keyring.set_password("dns.he.net", options.username, options.password) 
+    
     shell = HurricaneDNSShell(options.username, options.password)
     try:
         if not options.command:
